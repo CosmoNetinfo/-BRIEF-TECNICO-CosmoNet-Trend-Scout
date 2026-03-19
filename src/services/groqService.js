@@ -106,20 +106,20 @@ Restituisci ESCLUSIVAMENTE questo JSON:
   return callGroq([{ role: 'user', content: prompt }], true);
 }
 
-export async function generateBriefData(title, mainKw) {
-  const prompt = `Sei un esperto SEO italiano. Analizza questo argomento per un blog tech italiano (cosmonet.info) e restituisci SOLO un oggetto JSON valido, senza markdown, senza spiegazioni:
-   
-Argomento: ${title}
-Keyword principale: ${mainKw || 'N/A'}
+export async function generateBriefData(title) {
+  const prompt = `Sei un editor SEO esperto di cosmonet.info, blog tech italiano.
+Scrivi un brief dettagliato per un articolo su: ${title}
 
-{
-  "keyword_secondarie": ["kw1", "kw2", "kw3", "kw4", "kw5"],
-  "volume_stimato": "es. 1.000-5.000/mese",
-  "intento": "informazionale | commerciale | transazionale | navigazionale",
-  "difficolta": "bassa | media | alta",
-  "competitor": ["dominio1.com", "dominio2.com", "dominio3.com"],
-  "note": "una riga con indicazioni utili per scrivere l'articolo"
-}`;
+Il brief deve essere un testo narrativo in italiano di 150-250 parole che includa:
+- Contesto e rilevanza dell'argomento nel 2026
+- Struttura consigliata dell'articolo (sezioni chiave da trattare)
+- Dati, statistiche o fatti tecnici specifici da includere
+- Casi d'uso concreti per il target (sviluppatori, utenti Linux, tech enthusiast)
+- Eventuali confronti con alternative/competitor del prodotto/servizio trattato
+- Conclusione con implicazioni future per il lettore
 
-  return callGroq([{ role: 'user', content: prompt }], true);
+Scrivi SOLO il testo del brief, niente titoli, niente markdown, niente prefissi.
+Inizia direttamente con "Scrivi un articolo...".`;
+
+  return callGroq([{ role: 'user', content: prompt }], false);
 }
