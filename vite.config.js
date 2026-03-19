@@ -3,6 +3,6 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  base: '/trend-scout/', // nome esatto del repo GitHub
+  base: '/-BRIEF-TECNICO-CosmoNet-Trend-Scout/', // nome esatto del repo GitHub
   plugins: [react(), tailwindcss()],
 })
