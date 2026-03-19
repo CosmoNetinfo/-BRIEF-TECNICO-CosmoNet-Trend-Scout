@@ -1,5 +1,5 @@
 import { db } from '../firebase.js';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, serverTimestamp } from 'firebase/firestore';
 
 const TOPIC_TO_CAT = {
   ai:         'ai',
@@ -50,3 +50,14 @@ export async function saveAllIdeas(articles, topicId, existingTitles = new Set()
 
   return { saved, failed, skipped: articles.length - toSave.length };
 }
+
+export async function fetchPianoEditoriale(limitCount = 50) {
+  try {
+    const q = query(collection(db, 'piano_editoriale'), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).slice(0, limitCount);
+  } catch {
+    return [];
+  }
+}
+
