@@ -157,45 +157,23 @@ export default function App() {
   const handleCopyBrief = async (item) => {
     const id = item.id || item.wpId;
     const title = item.title || item.wpTitle || '';
-    const kw = item.kw || '';
-    const fallbackDiff = item.diff || 'Media';
 
     setCopyStatus({ id, state: 'loading' });
-    
-    let briefText = '';
 
     try {
-      const data = await generateBriefData(title, kw);
+      const narrativeText = await generateBriefData(title);
       
-      briefText = `---
-Argomento: ${title}
-Keyword principale: ${kw}
-Keyword secondarie: ${(data.keyword_secondarie || []).join(', ')}
-Volume stimato: ${data.volume_stimato || ''}
-Intento di ricerca: ${data.intento || ''}
-Difficoltà SEO: ${data.difficolta || fallbackDiff}
-Competitor principali: ${(data.competitor || []).join(', ')}
-Note per il brief: ${data.note || ''}
----`;
+      if (!narrativeText || narrativeText.trim() === '') {
+        throw new Error('Risposta vuota o non valida da Groq');
+      }
       
-      await navigator.clipboard.writeText(briefText);
+      await navigator.clipboard.writeText(narrativeText.trim());
       setCopyStatus({ id, state: 'success' });
       setTimeout(() => setCopyStatus({ id: null, state: 'idle' }), 2000);
     } catch (err) {
-      console.error('Error generating brief data:', err);
-      // Fallback
-      briefText = `---
-Argomento: ${title}
-Keyword principale: ${kw}
-Keyword secondarie: 
-Volume stimato: 
-Intento di ricerca: 
-Difficoltà SEO: ${fallbackDiff}
-Competitor principali: 
-Note per il brief: 
----`;
+      console.error('Error generating narrative brief:', err);
       try {
-        await navigator.clipboard.writeText(briefText);
+        await navigator.clipboard.writeText(`Scrivi un articolo su: ${title}`);
       } catch (clipErr) { console.error(clipErr); }
       
       setCopyStatus({ id, state: 'error' });
