@@ -105,3 +105,32 @@ Restituisci ESCLUSIVAMENTE questo JSON:
 
   return callGroq([{ role: 'user', content: prompt }], true);
 }
+
+export async function analyzeManualBrief(text) {
+  try {
+    const prompt = `Analizza il seguente prompt/brief fornito dall'utente e stabilisci i metadati base per un articolo SEO.
+
+TESTO DELL'UTENTE:
+"${text}"
+
+Estrai i seguenti dati e rispondi ESCLUSIVAMENTE con un JSON valido strutturato così:
+{
+  "title": "Un titolo SEO accattivante di max 60 caratteri (dedotto dal testo)",
+  "kw": "keyword principale (1-3 parole)",
+  "diff": "Bassa",
+  "cat": "News"
+}
+Non inserire spiegazioni, solo il JSON.`;
+
+    const res = await callGroq([{ role: 'user', content: prompt }], true);
+    return res;
+  } catch (error) {
+    console.error('Groq manual brief error:', error);
+    return {
+      title: text.length > 60 ? text.substring(0, 60) + '...' : text,
+      kw: '',
+      diff: 'Media',
+      cat: 'Generale'
+    };
+  }
+}

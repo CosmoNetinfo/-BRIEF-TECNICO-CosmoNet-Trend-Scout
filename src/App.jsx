@@ -1,16 +1,19 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
-  Telescope, TrendingUp, Newspaper, Lightbulb,
+  Telescope, Newspaper, Lightbulb,
   ArrowRight, CheckCircle2, Plus, ExternalLink,
   ChevronRight, Search, AlertCircle, Loader2,
-  Sparkles, BookOpen, Clock, RefreshCw, Globe, Zap
+  Sparkles, BookOpen, Clock, RefreshCw, Zap,
+  Save, Check, Copy
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from './services/firebaseConfig.js';
 
 import { fetchNewsForTopic }    from './services/newsService.js';
 import { fetchTrendingKeywords } from './services/keywordService.js';
-import { generateArticleIdeas } from './services/groqService.js';
+import { generateArticleIdeas, analyzeManualBrief } from './services/groqService.js';
 import { saveIdeaToPiano, fetchPianoEditoriale } from './services/firebaseService.js';
 import { fetchWordPressPosts }  from './services/wordpressService.js';
 import { TOPICS } from './config/sources.js';
@@ -41,6 +44,11 @@ export default function App() {
   const [result, setResult]         = useState(null);
   const [news, setNews]             = useState([]);
   const [savedIds, setSavedIds]     = useState(new Set());
+  const [copiedId, setCopiedId]     = useState(null);
+  
+  const [manualBrief, setManualBrief] = useState('');
+  const [isGeneratingManual, setIsGeneratingManual] = useState(false);
+
   const [error, setError]           = useState('');
   const [lastDate, setLastDate]     = useState(null);
 
@@ -150,6 +158,47 @@ export default function App() {
     statusFilter === 'pubblicato'  ? wpPosts.filter(p => p.wpStatus === 'publish') : [];
 
   const isLoading = statusFilter === 'da_scrivere' ? pianoLoading : wpLoading;
+
+  const handleCopyPrompt = (item) => {
+    const title = item.title || item.wpTitle || '';
+    const kw = item.kw ? `Assicurati di ottimizzare il testo per la keyword principale: "${item.kw}".` : '';
+    const link = item.url || item.link || '';
+    
+    const prompt = `Agisci come un copywriter esperto SEO. Scrivi un articolo dettagliato e coinvolgente in italiano partendo da questo argomento/titolo:\n\n"${title}"\n\n${kw}\nStruttura l'articolo con un'introduzione accattivante, paragrafi chiari (usa tag H2 e H3 pertinenti) e una conclusione riassuntiva. Mantieni un tono giornalistico, professionale ma accessibile.${link ? `\n\nUsa questa fonte per raccogliere le informazioni fattuali (rielabora senza copiare il testo): ${link}` : ''}`;
+    
+    navigator.clipboard.writeText(prompt);
+    const id = item.id || item.wpId;
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleGenerateManual = async () => {
+    if (!manualBrief.trim()) return;
+    setIsGeneratingManual(true);
+    try {
+      const data = await analyzeManualBrief(manualBrief);
+      const newItem = {
+        title: data.title || manualBrief.slice(0, 50),
+        kw: data.kw || '',
+        diff: data.diff || 'Media',
+        cat: data.cat || 'News',
+        url: '', 
+        source: 'manual',
+        status: 'da_scrivere',
+        date: new Date().toISOString()
+      };
+      
+      const docRef = await addDoc(collection(db, 'pianoEditoriale'), newItem);
+      const withId = { id: docRef.id, ...newItem };
+      setPiano(prev => [withId, ...prev]);
+      setManualBrief('');
+      setStatusFilter('da_scrivere');
+    } catch (err) {
+      console.error('Error adding manual brief:', err);
+    } finally {
+      setIsGeneratingManual(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -390,6 +439,7 @@ export default function App() {
         {activeTab === 'piano' && (
           <div className="space-y-4">
 
+
             {/* Header */}
             <div className="flex items-center justify-between">
               <h2 className="font-bold text-slate-900 flex items-center gap-2">
@@ -405,8 +455,43 @@ export default function App() {
               </button>
             </div>
 
+            {/* Manual Brief Input (Dark Mode Style) */}
+            <div className="bg-[#0b1120] rounded-2xl border border-slate-800 p-5 shadow-lg">
+              <h3 className="text-cyan-400 font-black text-[11px] tracking-widest uppercase mb-4">
+                Aggiungi Argomento Manualmente
+              </h3>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <textarea
+                    value={manualBrief}
+                    onChange={(e) => setManualBrief(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.ctrlKey && e.key === 'Enter') {
+                        e.preventDefault();
+                        handleGenerateManual();
+                      }
+                    }}
+                    placeholder="Es: Come usare Ollama su Linux... oppure incolla un brief dettagliato con dati verificati."
+                    className="w-full bg-transparent border border-slate-700/50 rounded-xl p-4 text-slate-300 placeholder:text-slate-600 text-sm min-h-[90px] focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 resize-y transition-colors"
+                  />
+                  <div className="absolute right-4 bottom-[-24px] text-right">
+                    <span className="text-[10px] text-slate-600 font-medium tracking-wide">
+                      Ctrl+Enter per generare &middot; Puoi incollare brief dettagliati con dati verificati
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={handleGenerateManual}
+                  disabled={isGeneratingManual || !manualBrief.trim()}
+                  className="px-8 bg-indigo-900/40 hover:bg-indigo-800/60 disabled:opacity-50 disabled:cursor-not-allowed border border-indigo-500/20 text-indigo-300 font-bold tracking-wider text-xs rounded-xl transition-colors flex items-center justify-center min-h-[90px]"
+                >
+                  {isGeneratingManual ? <Loader2 className="w-5 h-5 animate-spin" /> : 'GENERA'}
+                </button>
+              </div>
+            </div>
+
             {/* Status filter pills */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 pt-6">
               {STATUS_TABS.map(tab => (
                 <button
                   key={tab.id}
@@ -533,14 +618,24 @@ export default function App() {
                                   <a href={item.wpLink} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-blue-500 hover:text-blue-700">
                                     <ExternalLink className="w-3 h-3" /> PUBBLICATO
                                   </a>
+                                ) : (item.url || item.link) ? (
+                                  <a href={item.url || item.link} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-blue-500 hover:text-blue-700">
+                                    <ExternalLink className="w-3 h-3" /> APRI FONTE
+                                  </a>
                                 ) : (
                                   <span className="flex items-center gap-1.5 text-slate-400">
-                                    <ExternalLink className="w-3 h-3" /> DA SCRIVERE
+                                    <ExternalLink className="w-3 h-3" /> NESSUNA FONTE
                                   </span>
                                 )}
                                 
-                                <button className="flex items-center gap-1.5 text-indigo-500 hover:text-indigo-700 transition-colors">
-                                  LINK CORRELATI
+                                <button 
+                                  onClick={() => handleCopyPrompt(item)}
+                                  className={cn("flex items-center gap-1.5 transition-colors", 
+                                    (copiedId === (item.id || item.wpId)) ? "text-emerald-600 hover:text-emerald-700" : "text-indigo-500 hover:text-indigo-700"
+                                  )}
+                                >
+                                  {(copiedId === (item.id || item.wpId)) ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                  {(copiedId === (item.id || item.wpId)) ? 'COPIATO!' : 'COPIA PROMPT'}
                                 </button>
                               </div>
                             </td>
