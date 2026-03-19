@@ -11,7 +11,7 @@ import { twMerge } from 'tailwind-merge';
 
 import { fetchNewsForTopic }    from './services/newsService.js';
 import { fetchTrendingKeywords } from './services/keywordService.js';
-import { generateArticleIdeas } from './services/groqService.js';
+import { generateArticleIdeas, generateBriefData } from './services/groqService.js';
 import { saveIdeaToPiano, fetchPianoEditoriale } from './services/firebaseService.js';
 import { fetchWordPressPosts }  from './services/wordpressService.js';
 import { TOPICS } from './config/sources.js';
@@ -42,7 +42,7 @@ export default function App() {
   const [result, setResult]         = useState(null);
   const [news, setNews]             = useState([]);
   const [savedIds, setSavedIds]     = useState(new Set());
-  const [copiedId, setCopiedId]     = useState(null);
+  const [copyStatus, setCopyStatus] = useState({ id: null, state: 'idle' });
 
   const [error, setError]           = useState('');
   const [lastDate, setLastDate]     = useState(null);
@@ -154,26 +154,53 @@ export default function App() {
 
   const isLoading = statusFilter === 'da_scrivere' ? pianoLoading : wpLoading;
 
-  const handleCopyBrief = (item) => {
+  const handleCopyBrief = async (item) => {
+    const id = item.id || item.wpId;
     const title = item.title || item.wpTitle || '';
     const kw = item.kw || '';
-    const diff = item.diff || 'Media';
+    const fallbackDiff = item.diff || 'Media';
+
+    setCopyStatus({ id, state: 'loading' });
     
-    const briefText = `---
+    let briefText = '';
+
+    try {
+      const data = await generateBriefData(title, kw);
+      
+      briefText = `---
+Argomento: ${title}
+Keyword principale: ${kw}
+Keyword secondarie: ${(data.keyword_secondarie || []).join(', ')}
+Volume stimato: ${data.volume_stimato || ''}
+Intento di ricerca: ${data.intento || ''}
+Difficoltà SEO: ${data.difficolta || fallbackDiff}
+Competitor principali: ${(data.competitor || []).join(', ')}
+Note per il brief: ${data.note || ''}
+---`;
+      
+      await navigator.clipboard.writeText(briefText);
+      setCopyStatus({ id, state: 'success' });
+      setTimeout(() => setCopyStatus({ id: null, state: 'idle' }), 2000);
+    } catch (err) {
+      console.error('Error generating brief data:', err);
+      // Fallback
+      briefText = `---
 Argomento: ${title}
 Keyword principale: ${kw}
 Keyword secondarie: 
 Volume stimato: 
 Intento di ricerca: 
-Difficoltà SEO: ${diff}
+Difficoltà SEO: ${fallbackDiff}
 Competitor principali: 
 Note per il brief: 
 ---`;
-    
-    navigator.clipboard.writeText(briefText);
-    const id = item.id || item.wpId;
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+      try {
+        await navigator.clipboard.writeText(briefText);
+      } catch (clipErr) { console.error(clipErr); }
+      
+      setCopyStatus({ id, state: 'error' });
+      setTimeout(() => setCopyStatus({ id: null, state: 'idle' }), 3000);
+    }
   };
 
   return (
@@ -571,12 +598,26 @@ Note per il brief:
                                 
                                 <button 
                                   onClick={() => handleCopyBrief(item)}
-                                  className={cn("flex items-center gap-1.5 transition-colors", 
-                                    (copiedId === (item.id || item.wpId)) ? "text-emerald-600 hover:text-emerald-700" : "text-indigo-500 hover:text-indigo-700"
+                                  disabled={copyStatus.id === (item.id || item.wpId) && copyStatus.state === 'loading'}
+                                  className={cn("flex items-center gap-1.5 transition-colors disabled:opacity-50", 
+                                    (copyStatus.id === (item.id || item.wpId))
+                                      ? (copyStatus.state === 'success' ? "text-emerald-600 hover:text-emerald-700" 
+                                         : copyStatus.state === 'error' ? "text-red-500" 
+                                         : "text-indigo-400 cursor-wait")
+                                      : "text-indigo-500 hover:text-indigo-700"
                                   )}
                                 >
-                                  {(copiedId === (item.id || item.wpId)) ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                  {(copiedId === (item.id || item.wpId)) ? 'COPIATO!' : 'COPIA BRIEF'}
+                                  {copyStatus.id === (item.id || item.wpId) ? (
+                                    copyStatus.state === 'loading' ? <Loader2 className="w-3 h-3 animate-spin" />
+                                    : copyStatus.state === 'success' ? <Check className="w-3 h-3" />
+                                    : <AlertCircle className="w-3 h-3" />
+                                  ) : <Copy className="w-3 h-3" />}
+                                  
+                                  {copyStatus.id === (item.id || item.wpId) ? (
+                                    copyStatus.state === 'loading' ? 'GENERANDO...'
+                                    : copyStatus.state === 'success' ? 'COPIATO!'
+                                    : 'ERRORE, RIPROVA'
+                                  ) : 'COPIA BRIEF'}
                                 </button>
                               </div>
                             </td>

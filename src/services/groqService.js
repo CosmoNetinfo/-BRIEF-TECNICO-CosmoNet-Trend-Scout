@@ -105,3 +105,21 @@ Restituisci ESCLUSIVAMENTE questo JSON:
 
   return callGroq([{ role: 'user', content: prompt }], true);
 }
+
+export async function generateBriefData(title, mainKw) {
+  const prompt = `Sei un esperto SEO italiano. Analizza questo argomento per un blog tech italiano (cosmonet.info) e restituisci SOLO un oggetto JSON valido, senza markdown, senza spiegazioni:
+   
+Argomento: ${title}
+Keyword principale: ${mainKw || 'N/A'}
+
+{
+  "keyword_secondarie": ["kw1", "kw2", "kw3", "kw4", "kw5"],
+  "volume_stimato": "es. 1.000-5.000/mese",
+  "intento": "informazionale | commerciale | transazionale | navigazionale",
+  "difficolta": "bassa | media | alta",
+  "competitor": ["dominio1.com", "dominio2.com", "dominio3.com"],
+  "note": "una riga con indicazioni utili per scrivere l'articolo"
+}`;
+
+  return callGroq([{ role: 'user', content: prompt }], true);
+}
