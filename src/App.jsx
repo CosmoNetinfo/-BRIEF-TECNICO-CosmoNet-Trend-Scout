@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import {
-  Telescope, Newspaper, Lightbulb,
+  Telescope, TrendingUp, Newspaper, Lightbulb,
   ArrowRight, CheckCircle2, Plus, ExternalLink,
   ChevronRight, Search, AlertCircle, Loader2,
   Sparkles, BookOpen, Clock, RefreshCw, Zap,
