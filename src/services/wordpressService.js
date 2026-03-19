@@ -10,14 +10,13 @@ function getAuthHeaders() {
 }
 
 /**
- * Fetch posts from WordPress REST API with authentication.
- * Supports: publish, future (scheduled), draft
+ * Fetch ALL pages of posts for a given status from WordPress REST API.
  */
-async function fetchWPPosts(status = 'publish', perPage = 100, page = 1) {
+async function fetchWPPostsAllPages(status = 'publish') {
   const params = new URLSearchParams({
     status,
-    per_page: perPage,
-    page,
+    per_page: '100',
+    page: '1',
     _fields: 'id,slug,title,date,modified,link,status,categories,excerpt',
     orderby: 'date',
     order: 'desc',
@@ -28,10 +27,31 @@ async function fetchWPPosts(status = 'publish', perPage = 100, page = 1) {
       headers: getAuthHeaders(),
     });
     if (!res.ok) return [];
+
     const posts = await res.json();
     if (!Array.isArray(posts)) return [];
+    
+    const allPosts = [...posts];
+    const totalPages = parseInt(res.headers.get('x-wp-totalpages') || '1', 10);
 
-    return posts.map(p => ({
+    // Fetch remaining pages concurrently
+    if (totalPages > 1) {
+      const pagePromises = [];
+      for (let i = 2; i <= totalPages; i++) {
+        const pageParams = new URLSearchParams(params);
+        pageParams.set('page', i.toString());
+        pagePromises.push(
+          fetch(`${WP_BASE}/wp-json/wp/v2/posts?${pageParams}`, { headers: getAuthHeaders() })
+            .then(r => r.ok ? r.json() : [])
+        );
+      }
+      const pagesData = await Promise.all(pagePromises);
+      for (const pageData of pagesData) {
+        if (Array.isArray(pageData)) allPosts.push(...pageData);
+      }
+    }
+
+    return allPosts.map(p => ({
       wpId:      p.id,
       slug:      p.slug,
       title:     (p.title?.rendered || '')
@@ -56,7 +76,7 @@ export async function fetchWordPressPosts() {
   const statuses = isAuth ? ['publish', 'future', 'draft'] : ['publish'];
 
   const results = await Promise.allSettled(
-    statuses.map(s => fetchWPPosts(s, 100))
+    statuses.map(s => fetchWPPostsAllPages(s))
   );
 
   return results

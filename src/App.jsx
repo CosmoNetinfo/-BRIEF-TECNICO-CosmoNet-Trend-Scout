@@ -25,7 +25,6 @@ const STATUS_TABS = [
   { id: 'da_scrivere', label: 'Da Scrivere', dot: 'bg-slate-400'   },
   { id: 'programmato', label: 'Programmato', dot: 'bg-amber-400'   },
   { id: 'pubblicato',  label: 'Pubblicato',  dot: 'bg-emerald-500' },
-  { id: 'wordpress',   label: 'WordPress',   dot: 'bg-blue-500'    },
 ];
 
 const DIFF_BADGE = {
@@ -135,19 +134,22 @@ export default function App() {
 
   // Merge WP posts into piano for counts
   const pianoByStatus = STATUS_TABS.reduce((acc, tab) => {
-    if (tab.id === 'wordpress') {
-      acc[tab.id] = wpPosts.length;
-    } else {
+    if (tab.id === 'da_scrivere') {
       acc[tab.id] = piano.filter(i => (i.status || 'da_scrivere') === tab.id).length;
+    } else if (tab.id === 'programmato') {
+      acc[tab.id] = wpPosts.filter(p => p.wpStatus === 'future').length;
+    } else if (tab.id === 'pubblicato') {
+      acc[tab.id] = wpPosts.filter(p => p.wpStatus === 'publish').length;
     }
     return acc;
   }, {});
 
-  const filteredPiano = statusFilter === 'wordpress'
-    ? wpPosts
-    : piano.filter(i => (i.status || 'da_scrivere') === statusFilter);
+  const filteredPiano = 
+    statusFilter === 'da_scrivere' ? piano.filter(i => (i.status || 'da_scrivere') === 'da_scrivere') :
+    statusFilter === 'programmato' ? wpPosts.filter(p => p.wpStatus === 'future') :
+    statusFilter === 'pubblicato'  ? wpPosts.filter(p => p.wpStatus === 'publish') : [];
 
-  const isLoading = pianoLoading || (statusFilter === 'wordpress' && wpLoading);
+  const isLoading = statusFilter === 'da_scrivere' ? pianoLoading : wpLoading;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -418,7 +420,7 @@ export default function App() {
                 >
                   <span className={cn("w-2 h-2 rounded-full", tab.dot)} />
                   {tab.label}
-                  {tab.id === 'wordpress'
+                  {tab.id !== 'da_scrivere'
                     ? <span className={cn("ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black", statusFilter === tab.id ? "bg-white/20" : "bg-slate-100 text-slate-500")}>
                         {wpLoading ? '…' : pianoByStatus[tab.id]}
                       </span>
@@ -439,14 +441,13 @@ export default function App() {
             ) : filteredPiano.length === 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
                 <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto mb-3">
-                  {statusFilter === 'wordpress' ? <Globe className="w-6 h-6 text-slate-400" /> : <BookOpen className="w-6 h-6 text-slate-400" />}
+                  {statusFilter !== 'da_scrivere' ? <Globe className="w-6 h-6 text-slate-400" /> : <BookOpen className="w-6 h-6 text-slate-400" />}
                 </div>
                 <p className="font-semibold text-slate-700 text-sm">Nessun contenuto</p>
                 <p className="text-slate-400 text-xs mt-1">
                   {statusFilter === 'da_scrivere' && 'Aggiungi idee dall\'analisi trend.'}
-                  {statusFilter === 'programmato'  && 'Nessun articolo in programmazione.'}
-                  {statusFilter === 'pubblicato'   && 'Nessun articolo pubblicato trovato.'}
-                  {statusFilter === 'wordpress'    && 'Nessun post trovato su WordPress.'}
+                  {statusFilter === 'programmato'  && 'Nessun articolo in programmazione su WordPress.'}
+                  {statusFilter === 'pubblicato'   && 'Nessun articolo pubblicato su WordPress.'}
                 </p>
               </div>
             ) : (
@@ -459,7 +460,7 @@ export default function App() {
                         <h4 className="font-bold text-slate-800 text-sm leading-snug flex-1">
                           {item.title || item.wpTitle || '—'}
                         </h4>
-                        {statusFilter === 'wordpress' && item.wpLink && (
+                        {statusFilter !== 'da_scrivere' && item.wpLink && (
                           <a href={item.wpLink} target="_blank" rel="noreferrer" className="shrink-0 text-blue-500">
                             <ExternalLink className="w-4 h-4" />
                           </a>
@@ -495,81 +496,110 @@ export default function App() {
 
                 {/* Desktop: table */}
                 <div className="hidden sm:block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                  {statusFilter === 'wordpress' ? (
-                    /* WordPress table */
-                    <table className="zebra-table">
-                      <thead>
-                        <tr>
-                          <th>Titolo</th>
-                          <th>Stato WP</th>
-                          <th>Data</th>
-                          <th>Link</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredPiano.map((post, i) => (
-                          <tr key={post.wpId || i}>
-                            <td className="font-medium text-slate-800 max-w-sm">
-                              <div className="line-clamp-2">{post.title}</div>
+                  <table className="w-full text-left border-collapse">
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredPiano.map((item, i) => {
+                        const isWP = !!item.wpId;
+                        const isPublished = isWP ? item.wpStatus === 'publish' : item.status === 'pubblicato';
+                        const title = item.title || item.wpTitle || '—';
+                        const dateObj = item.date ? new Date(item.date) : null;
+                        const month = dateObj ? dateObj.toLocaleString('it-IT', { month: 'long' }) : '—';
+                        const year = dateObj ? dateObj.getFullYear() : '';
+                        
+                        return (
+                          <tr key={item.id || item.wpId || i} className="hover:bg-slate-50/50 transition-colors group">
+                            <td className="py-5 px-4 w-12 text-center align-top">
+                              <input type="checkbox" className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 w-4 h-4 mt-1" />
                             </td>
-                            <td>
-                              <span className={cn("text-[10px] font-black uppercase px-2 py-0.5 rounded",
-                                post.wpStatus === 'publish' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
-                                {post.wpStatus === 'publish' ? '✓ Pubblicato' : '🕐 Programmato'}
-                              </span>
+                            <td className="py-5 px-4 w-12 text-center align-top">
+                              <span className="text-xs font-medium text-slate-400 mt-1 block">{i + 1}</span>
                             </td>
-                            <td className="text-xs text-slate-500 whitespace-nowrap">
-                              {new Date(post.date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            <td className="py-5 px-4 w-[40%] align-top">
+                              <div className={cn("font-bold text-sm mb-2.5 line-clamp-2", isPublished ? "text-slate-400 line-through decoration-slate-300" : "text-slate-800")}>
+                                {title}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-4 text-[9px] font-bold uppercase tracking-wider">
+                                {isWP ? (
+                                  <span className="flex items-center gap-1.5 text-emerald-600">
+                                    <RefreshCw className="w-3 h-3" /> WP
+                                  </span>
+                                ) : (
+                                  <span className="flex items-center gap-1.5 text-slate-400">
+                                    <BookOpen className="w-3 h-3" /> PIANO
+                                  </span>
+                                )}
+                                
+                                {item.wpLink ? (
+                                  <a href={item.wpLink} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-blue-500 hover:text-blue-700">
+                                    <ExternalLink className="w-3 h-3" /> PUBBLICATO
+                                  </a>
+                                ) : (
+                                  <span className="flex items-center gap-1.5 text-slate-400">
+                                    <ExternalLink className="w-3 h-3" /> DA SCRIVERE
+                                  </span>
+                                )}
+                                
+                                <button className="flex items-center gap-1.5 text-indigo-500 hover:text-indigo-700 transition-colors">
+                                  LINK CORRELATI
+                                </button>
+                              </div>
                             </td>
-                            <td>
-                              <a href={post.wpLink} target="_blank" rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
-                                <Globe className="w-3.5 h-3.5" />Apri
-                              </a>
+                            <td className="py-5 px-4 align-top text-center w-[15%]">
+                              <div className="flex flex-col items-center gap-2">
+                                {item.cat ? (
+                                  <span className="inline-block px-3 py-1 bg-emerald-50/80 text-emerald-700 font-bold text-[11px] rounded transition-colors border border-emerald-100/50">
+                                    {item.cat}
+                                  </span>
+                                ) : <span className="text-slate-300 text-xs">—</span>}
+                                <button className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold text-[9px] uppercase tracking-wider rounded transition-colors w-full text-center">
+                                  CHECK SEO
+                                </button>
+                              </div>
                             </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    /* Firestore piano table */
-                    <table className="zebra-table">
-                      <thead>
-                        <tr>
-                          <th>Titolo</th>
-                          <th>Keyword</th>
-                          <th>Categoria</th>
-                          <th>Difficoltà</th>
-                          <th>Fonte</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredPiano.map(item => (
-                          <tr key={item.id}>
-                            <td className="font-medium text-slate-800">
-                              <div className="max-w-sm line-clamp-2">{item.title}</div>
+                            <td className="py-5 px-4 align-top text-center w-[5%]">
+                              <span className="text-slate-300 text-sm mt-1 block">—</span>
                             </td>
-                            <td>
-                              {item.kw && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-medium whitespace-nowrap">
-                                  <Search className="w-3 h-3" />{item.kw}
-                                </span>
-                              )}
-                            </td>
-                            <td><span className="text-xs font-bold uppercase tracking-widest text-slate-500">{item.cat || '—'}</span></td>
-                            <td>
-                              {item.diff && (
-                                <span className={cn("text-[10px] font-black uppercase px-2 py-0.5 rounded", DIFF_BADGE[item.diff] || 'bg-slate-100 text-slate-500')}>
+                            <td className="py-5 px-4 text-center align-top w-[10%]">
+                              {item.diff ? (
+                                <span className={cn("inline-block px-2.5 py-1 font-black text-[10px] rounded", item.diff.toLowerCase() === 'bassa' ? "bg-emerald-50 text-emerald-600" : DIFF_BADGE[item.diff] || 'bg-slate-100 text-slate-500')}>
                                   {item.diff}
                                 </span>
-                              )}
+                              ) : <span className="text-slate-300 text-xs mt-1 block">—</span>}
                             </td>
-                            <td><span className="text-xs text-slate-400 whitespace-nowrap">{item.source === 'trend-scout' ? '🔭 Scout' : '✏️ Manuale'}</span></td>
+                            <td className="py-5 px-4 text-center align-top w-[10%] text-slate-800">
+                              {dateObj ? (
+                                <>
+                                  <div className="font-bold text-xs capitalize mb-1">{month}</div>
+                                  <div className="text-[10px] text-slate-400 font-medium">{year}</div>
+                                </>
+                              ) : <span className="text-slate-300 text-xs mt-1 block">—</span>}
+                            </td>
+                            <td className="py-5 px-4 text-center align-top w-[10%]">
+                              <span className={cn("inline-block px-3 py-1 font-bold text-[11px] rounded-full", 
+                                isPublished ? "bg-emerald-50 text-emerald-600" :
+                                (isWP && item.wpStatus === 'future') || item.status === 'programmato' ? "bg-amber-50 text-amber-600" :
+                                "bg-slate-100 text-slate-500"
+                              )}>
+                                {isPublished ? 'Pubblicato' : (isWP && item.wpStatus === 'future') || item.status === 'programmato' ? 'Programmato' : 'Da Scrivere'}
+                              </span>
+                            </td>
+                            <td className="py-5 px-4 text-right align-top w-[5%]">
+                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-500 hover:bg-indigo-100 flex items-center justify-center transition-colors">
+                                  <Search className="w-3.5 h-3.5" />
+                                </button>
+                                {!isWP && (
+                                  <button className="w-7 h-7 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center transition-colors">
+                                    <AlertCircle className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </>
             )}
