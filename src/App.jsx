@@ -9,7 +9,7 @@ import {
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from './services/firebaseConfig.js';
+import { db } from './firebase.js';
 
 import { fetchNewsForTopic }    from './services/newsService.js';
 import { fetchTrendingKeywords } from './services/keywordService.js';
