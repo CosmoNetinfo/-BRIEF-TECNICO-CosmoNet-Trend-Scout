@@ -159,14 +159,23 @@ export default function App() {
 
   const isLoading = statusFilter === 'da_scrivere' ? pianoLoading : wpLoading;
 
-  const handleCopyPrompt = (item) => {
+  const handleCopyBrief = (item) => {
     const title = item.title || item.wpTitle || '';
-    const kw = item.kw ? `Assicurati di ottimizzare il testo per la keyword principale: "${item.kw}".` : '';
-    const link = item.url || item.link || '';
+    const kw = item.kw || '';
+    const diff = item.diff || 'Media';
     
-    const prompt = `Agisci come un copywriter esperto SEO. Scrivi un articolo dettagliato e coinvolgente in italiano partendo da questo argomento/titolo:\n\n"${title}"\n\n${kw}\nStruttura l'articolo con un'introduzione accattivante, paragrafi chiari (usa tag H2 e H3 pertinenti) e una conclusione riassuntiva. Mantieni un tono giornalistico, professionale ma accessibile.${link ? `\n\nUsa questa fonte per raccogliere le informazioni fattuali (rielabora senza copiare il testo): ${link}` : ''}`;
+    const briefText = `---
+Argomento: ${title}
+Keyword principale: ${kw}
+Keyword secondarie: 
+Volume stimato: 
+Intento di ricerca: 
+Difficoltà SEO: ${diff}
+Competitor principali: 
+Note per il brief: 
+---`;
     
-    navigator.clipboard.writeText(prompt);
+    navigator.clipboard.writeText(briefText);
     const id = item.id || item.wpId;
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -629,13 +638,13 @@ export default function App() {
                                 )}
                                 
                                 <button 
-                                  onClick={() => handleCopyPrompt(item)}
+                                  onClick={() => handleCopyBrief(item)}
                                   className={cn("flex items-center gap-1.5 transition-colors", 
                                     (copiedId === (item.id || item.wpId)) ? "text-emerald-600 hover:text-emerald-700" : "text-indigo-500 hover:text-indigo-700"
                                   )}
                                 >
                                   {(copiedId === (item.id || item.wpId)) ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                  {(copiedId === (item.id || item.wpId)) ? 'COPIATO!' : 'COPIA PROMPT'}
+                                  {(copiedId === (item.id || item.wpId)) ? 'COPIATO!' : 'COPIA BRIEF'}
                                 </button>
                               </div>
                             </td>
