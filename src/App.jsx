@@ -534,8 +534,11 @@ export default function App() {
                         const isPublished = isWP ? item.wpStatus === 'publish' : item.status === 'pubblicato';
                         const title = item.title || item.wpTitle || '—';
                         const dateObj = item.date ? new Date(item.date) : null;
-                        const month = dateObj ? dateObj.toLocaleString('it-IT', { month: 'long' }) : '—';
+                        const day = dateObj ? dateObj.getDate() : '';
+                        const month = dateObj ? dateObj.toLocaleString('it-IT', { month: 'short' }) : '—';
                         const year = dateObj ? dateObj.getFullYear() : '';
+                        const time = dateObj ? dateObj.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '';
+                        const isScheduled = (isWP && item.wpStatus === 'future') || item.status === 'programmato';
                         
                         return (
                           <tr key={item.id || item.wpId || i} className="hover:bg-slate-50/50 transition-colors group">
@@ -624,8 +627,10 @@ export default function App() {
                             <td className="py-5 px-4 text-center align-top w-[10%] text-slate-800">
                               {dateObj ? (
                                 <>
-                                  <div className="font-bold text-xs capitalize mb-1">{month}</div>
-                                  <div className="text-[10px] text-slate-400 font-medium">{year}</div>
+                                  <div className="font-bold text-xs capitalize mb-1">{day} {month}</div>
+                                  <div className="text-[10px] text-slate-400 font-medium">
+                                    {isScheduled ? `${year} • ${time}` : year}
+                                  </div>
                                 </>
                               ) : <span className="text-slate-300 text-xs mt-1 block">—</span>}
                             </td>
